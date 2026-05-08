@@ -1,0 +1,54 @@
+name: Create GitHub pre-release
+
+on:
+  workflow_run:
+    workflows:
+      - "Build, sign, and notarize on push to main"
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Workflow run ID from build_main to download artifacts from"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create pre-release
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts from build workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: artifacts
+          run-id: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_id || github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from project
+        id: meta
+        run: |
+          VERSION=$(grep 'MARKETING_VERSION = ' "AutoPkg Wizard/AutoPkg Wizard.xcodeproj/project.pbxproj" | head -1 | sed 's/.*= //;s/;//;s/ //g')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create pre-release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: AutoPkg Wizard ${{ steps.meta.outputs.version }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            artifacts/AutoPkgWizard-${{ steps.meta.outputs.version }}.pkg
+            artifacts/AutoPkgWizard-${{ steps.meta.outputs.version }}.dmg
