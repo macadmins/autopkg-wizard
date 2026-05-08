@@ -175,9 +175,9 @@ struct SettingsView: View {
         VStack(spacing: 16) {
             Spacer()
 
-            Image(systemName: "wand.and.stars")
-                .font(.system(size: 48))
-                .foregroundStyle(.tint)
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 48, height: 48)
 
             Text("AutoPkg Wizard")
                 .font(.title.bold())
@@ -199,7 +199,7 @@ struct SettingsView: View {
             Link("AutoPkg on GitHub", destination: URL(string: "https://github.com/autopkg/autopkg")!)
                 .font(.caption)
 
-            Link("AutoPkgr Wiki", destination: URL(string: "https://github.com/lindegroup/autopkgr/wiki")!)
+            Link("AutoPkg Wizard on GitHub", destination: URL(string: "https://github.com/grahampugh/autopkg-wizard")!)
                 .font(.caption)
 
             Spacer()

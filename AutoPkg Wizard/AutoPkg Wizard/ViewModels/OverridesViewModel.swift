@@ -19,6 +19,12 @@ final class OverridesViewModel {
     /// Validation error shown inline (not as an alert)
     var validationError: String?
 
+    /// Parsed structured document for the selected override
+    var document: OverrideDocument?
+
+    /// Whether to show raw editor instead of structured view
+    var showRawEditor = false
+
     enum TrustState: Sendable {
         case unknown
         case verifying
@@ -52,26 +58,84 @@ final class OverridesViewModel {
         selectedOverride = override
         validationError = nil
         statusMessage = nil
+        showRawEditor = false
         do {
             selectedOverrideContents = try override.contents()
+            let fileType = OverrideFileType.detect(
+                fileName: override.fileName,
+                content: selectedOverrideContents
+            )
+            document = OverrideDocument.parse(content: selectedOverrideContents, fileType: fileType)
         } catch {
             selectedOverrideContents = "Error reading file: \(error.localizedDescription)"
+            document = nil
         }
+    }
+
+    /// Update a single input key in the structured document.
+    func updateInputValue(key: String, value: InputValue) {
+        guard var doc = document else { return }
+        if let idx = doc.input.firstIndex(where: { $0.key == key }) {
+            doc.input[idx].value = value
+        }
+        document = doc
+    }
+
+    /// Update a metadata key in the structured document.
+    func updateMetadataValue(key: String, value: InputValue) {
+        guard var doc = document else { return }
+        if let idx = doc.metadata.firstIndex(where: { $0.key == key }) {
+            doc.metadata[idx].value = value
+        }
+        document = doc
+    }
+
+    /// Add a new input key.
+    func addInputKey(_ key: String, value: InputValue) {
+        guard var doc = document else { return }
+        guard !key.isEmpty, !doc.input.contains(where: { $0.key == key }) else { return }
+        doc.input.append((key: key, value: value))
+        document = doc
+    }
+
+    /// Remove an input key by name.
+    func removeInputKey(_ key: String) {
+        guard var doc = document else { return }
+        doc.input.removeAll { $0.key == key }
+        document = doc
+    }
+
+    /// Replace the entire input array (used for reordering after add/remove within nested structures).
+    func replaceInput(_ input: [(key: String, value: InputValue)]) {
+        guard var doc = document else { return }
+        doc.input = input
+        document = doc
     }
 
     func saveOverrideContents() {
         guard let override = selectedOverride else { return }
 
-        // Validate the content before saving
-        let fileType = OverrideFileType.detect(fileName: override.fileName, content: selectedOverrideContents)
-        if let error = validateContent(selectedOverrideContents, fileType: fileType) {
-            validationError = error
+        let contentToSave: String
+
+        if showRawEditor {
+            // Save from the raw text editor
+            let fileType = OverrideFileType.detect(fileName: override.fileName, content: selectedOverrideContents)
+            if let error = validateContent(selectedOverrideContents, fileType: fileType) {
+                validationError = error
+                return
+            }
+            contentToSave = selectedOverrideContents
+        } else if let doc = document, let serialized = doc.serialize() {
+            contentToSave = serialized
+        } else {
+            validationError = "Failed to serialize override document."
             return
         }
 
         validationError = nil
         do {
-            try selectedOverrideContents.write(toFile: override.filePath, atomically: true, encoding: .utf8)
+            try contentToSave.write(toFile: override.filePath, atomically: true, encoding: .utf8)
+            selectedOverrideContents = contentToSave
             statusMessage = "Override saved."
             // Clear status after a delay
             Task {
@@ -83,6 +147,20 @@ final class OverridesViewModel {
         } catch {
             errorMessage = "Failed to save override: \(error.localizedDescription)"
             showError = true
+        }
+    }
+
+    /// Sync from raw editor back to structured document (when switching modes).
+    func syncFromRawEditor() {
+        guard let override = selectedOverride else { return }
+        let fileType = OverrideFileType.detect(fileName: override.fileName, content: selectedOverrideContents)
+        document = OverrideDocument.parse(content: selectedOverrideContents, fileType: fileType)
+    }
+
+    /// Sync from structured document to raw editor text.
+    func syncToRawEditor() {
+        if let doc = document, let serialized = doc.serialize() {
+            selectedOverrideContents = serialized
         }
     }
 

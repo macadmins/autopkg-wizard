@@ -60,6 +60,7 @@ debug:
 		-configuration Debug \
 		-destination "platform=macOS" \
 		SYMROOT="$(BUILD_DIR)" \
+		CODE_SIGNING_ALLOWED=NO \
 		build
 	@echo "==> Debug app ready: $(DEBUG_APP)"
 

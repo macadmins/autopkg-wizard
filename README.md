@@ -60,7 +60,9 @@ The landing page shows a dashboard with counts of repos, recipes, and overrides,
 - View override file contents in a detail pane
 - Verify and update trust info per override with status indicators
 - Reveal override files in Finder
-- Syntax-highlighted viewer for override contents with support for YAML and PLIST formats
+- Support for YAML and PLIST formats
+- Recipe override inputs are shown as a structured, human-readable list
+- Alternative syntax-highlighted "raw" viewer for full control
 - Edit and save overrides directly inline, with real-time validation on save.
 - List edit mode with multi-select for bulk deletion
 

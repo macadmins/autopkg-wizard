@@ -476,7 +476,7 @@ struct RecipeInfoSheet: View {
                                 infoSection {
                                     ForEach(Array(info.inputValues.enumerated()), id: \.offset) { index, entry in
                                         if index > 0 { Divider() }
-                                        infoRow(entry.key, value: entry.value)
+                                        InputValueRow(label: entry.key, value: entry.value)
                                     }
                                 }
                             }
@@ -525,5 +525,79 @@ struct RecipeInfoSheet: View {
                 .font(.system(.body, design: .monospaced))
                 .textSelection(.enabled)
         }
+    }
+}
+
+// MARK: - Input Value Row (recursive)
+
+struct InputValueRow: View {
+    let label: String
+    let value: InputValue
+    var indentLevel: Int = 0
+
+    var body: some View {
+        switch value {
+        case .dict(let entries):
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
+                        if index > 0 { Divider() }
+                        InputValueRow(label: entry.key, value: entry.value, indentLevel: indentLevel + 1)
+                    }
+                }
+                .padding(.leading, 4)
+            } label: {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+            }
+        case .list(let items):
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        if index > 0 { Divider() }
+                        if item.isComplex {
+                            InputValueRow(label: "[\(index)]", value: item, indentLevel: indentLevel + 1)
+                        } else {
+                            InputValueLeaf(text: item.displayString)
+                        }
+                    }
+                }
+                .padding(.leading, 4)
+            } label: {
+                HStack(spacing: 4) {
+                    Text(label).font(.caption).foregroundStyle(.secondary)
+                    Text("(\(items.count) item\(items.count == 1 ? "" : "s"))")
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+        case .string(let s) where s.contains("\n"):
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+                ScrollView {
+                    Text(s)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(6)
+                .frame(maxHeight: min(CGFloat(s.components(separatedBy: "\n").count + 1) * 14, 200))
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+        default:
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+                InputValueLeaf(text: value.displayString)
+            }
+        }
+    }
+}
+
+struct InputValueLeaf: View {
+    let text: String
+
+    var body: some View {
+        Text(text.isEmpty ? "—" : text)
+            .font(.system(.body, design: .monospaced))
+            .textSelection(.enabled)
     }
 }
