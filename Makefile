@@ -26,8 +26,8 @@ SCHEME	   := AutoPkg Wizard
 VERSION	  := $(shell grep 'MARKETING_VERSION = ' "$(PROJECT)/project.pbxproj" | head -1 | sed 's/.*= //;s/;//;s/ //g')
 TAG		  := v$(VERSION)
 
-SIGN_ID_APP	?= Developer ID Application: Graham Pugh
-SIGN_ID_PKG	?= Developer ID Installer: Graham Pugh
+SIGN_ID_APP	?= Developer ID Application: Mac Admins Open Source
+SIGN_ID_PKG	?= Developer ID Installer: Mac Admins Open Source
 NOTARY_PROFILE ?= graham-notary-profile-autopkg-wizard
 TEAM_ID		?= C96ALZKYH6
 
@@ -163,6 +163,9 @@ release: clean-output
 		-scheme "$(SCHEME)" \
 		-configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
 		-destination "platform=macOS" \
+		CODE_SIGN_STYLE=Manual \
+		CODE_SIGN_IDENTITY="-" \
+		DEVELOPMENT_TEAM="" \
 		SYMROOT="$(BUILD_DIR)" \
 		build
 	@echo ""
