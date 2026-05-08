@@ -1,0 +1,156 @@
+name: Build, sign, and notarize on push to main
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - ".github/**"
+      - "images/**"
+      - "**/CHANGELOG.md"
+      - "**/README.md"
+
+jobs:
+  build:
+    name: Xcode build, sign, and notarize
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install app signing certificates
+        uses: apple-actions/import-codesign-certs@8f3fb608891dd2244cdab3d69cd68c0d37a7fe93 # v2.0.0
+        with:
+          keychain-password: ${{ github.run_id }}
+          p12-file-base64: ${{ secrets.APP_CERTIFICATES_P12_MAOS }}
+          p12-password: ${{ secrets.APP_CERTIFICATES_P12_PASSWORD_MAOS }}
+
+      - name: Install package signing certificates
+        uses: apple-actions/import-codesign-certs@8f3fb608891dd2244cdab3d69cd68c0d37a7fe93 # v2.0.0
+        with:
+          create-keychain: false
+          keychain-password: ${{ github.run_id }}
+          p12-file-base64: ${{ secrets.PKG_CERTIFICATES_P12_MAOS }}
+          p12-password: ${{ secrets.PKG_CERTIFICATES_P12_PASSWORD_MAOS }}
+
+      - name: Build release app
+        run: |
+          xcodebuild \
+            -project "AutoPkg Wizard/AutoPkg Wizard.xcodeproj" \
+            -scheme "AutoPkg Wizard" \
+            -configuration Release ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+            -destination "platform=macOS" \
+            SYMROOT="$(pwd)/.build" \
+            build
+
+      - name: Set environment variables
+        run: |
+          VERSION=$(grep 'MARKETING_VERSION = ' "AutoPkg Wizard/AutoPkg Wizard.xcodeproj/project.pbxproj" | head -1 | sed 's/.*= //;s/;//;s/ //g')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "APP_PATH=$(pwd)/.build/Release/AutoPkg Wizard.app" >> $GITHUB_ENV
+
+      - name: Sign app bundle
+        run: |
+          # Sign embedded frameworks and libraries
+          find "$APP_PATH/Contents/Frameworks" -maxdepth 1 \
+            \( -name "*.framework" -o -name "*.dylib" \) 2>/dev/null | \
+            while IFS= read -r item; do
+              echo "Signing: $item"
+              /usr/bin/codesign --force --options runtime --timestamp \
+                --sign "${{ vars.SIGN_ID_APP }}" "$item"
+            done
+          # Sign the app bundle
+          /usr/bin/codesign --force --options runtime --timestamp \
+            --sign "${{ vars.SIGN_ID_APP }}" "$APP_PATH"
+          # Verify
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+      - name: Notarize app
+        run: |
+          # Zip app for notarization
+          /usr/bin/ditto -c -k --keepParent "$APP_PATH" "/tmp/AutoPkgWizard.zip"
+          # Store credentials and submit
+          xcrun notarytool store-credentials \
+            --apple-id "${{ vars.NOTARY_APPLE_ID }}" \
+            --team-id "${{ vars.TEAM_ID }}" \
+            --password "${{ secrets.NOTARY_APP_PASSWORD_MAOS }}" \
+            default
+          xcrun notarytool submit "/tmp/AutoPkgWizard.zip" \
+            --keychain-profile "default" \
+            --wait
+          # Staple
+          xcrun stapler staple "$APP_PATH"
+          rm -f /tmp/AutoPkgWizard.zip
+
+      - name: Build installer package
+        run: |
+          mkdir -p artifacts
+          COMPONENT="artifacts/AutoPkgWizard-component.pkg"
+          DIST_XML="artifacts/distribution.xml"
+
+          # Create component package
+          pkgbuild \
+            --component "$APP_PATH" \
+            --install-location /Applications \
+            --identifier "com.grahamrpugh.AutoPkg-Wizard" \
+            --version "$VERSION" \
+            --sign "${{ vars.SIGN_ID_PKG }}" \
+            "$COMPONENT"
+
+          # Write distribution XML
+          cat > "$DIST_XML" <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <installer-gui-script minSpecVersion="2">
+              <title>AutoPkg Wizard</title>
+              <pkg-ref id="com.grahamrpugh.AutoPkg-Wizard"/>
+              <options customize="never" require-scripts="false" rootVolumeOnly="true"/>
+              <choices-outline>
+                  <line choice="default">
+                      <line choice="com.grahamrpugh.AutoPkg-Wizard"/>
+                  </line>
+              </choices-outline>
+              <choice id="default"/>
+              <choice id="com.grahamrpugh.AutoPkg-Wizard" visible="false">
+                  <pkg-ref id="com.grahamrpugh.AutoPkg-Wizard"/>
+              </choice>
+              <pkg-ref id="com.grahamrpugh.AutoPkg-Wizard" version="$VERSION" onConclusion="none">AutoPkgWizard-component.pkg</pkg-ref>
+          </installer-gui-script>
+          EOF
+
+          # Create distribution package
+          productbuild \
+            --distribution "$DIST_XML" \
+            --package-path artifacts \
+            --sign "${{ vars.SIGN_ID_PKG }}" \
+            "artifacts/AutoPkgWizard-${VERSION}.pkg"
+
+          rm -f "$COMPONENT" "$DIST_XML"
+
+      - name: Notarize package
+        run: |
+          xcrun notarytool submit "artifacts/AutoPkgWizard-${VERSION}.pkg" \
+            --keychain-profile "default" \
+            --wait
+          xcrun stapler staple "artifacts/AutoPkgWizard-${VERSION}.pkg"
+
+      - name: Build DMG
+        run: |
+          DMG_STAGING=$(mktemp -d)
+          cp -R "$APP_PATH" "$DMG_STAGING/AutoPkg Wizard.app"
+          ln -s /Applications "$DMG_STAGING/Applications"
+          hdiutil create \
+            -volname "AutoPkg Wizard" \
+            -srcfolder "$DMG_STAGING" \
+            -ov \
+            -format UDZO \
+            -imagekey zlib-level=9 \
+            "artifacts/AutoPkgWizard-${VERSION}.dmg"
+          xcrun stapler staple "artifacts/AutoPkgWizard-${VERSION}.dmg" || true
+          rm -rf "$DMG_STAGING"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts
+          path: artifacts/
