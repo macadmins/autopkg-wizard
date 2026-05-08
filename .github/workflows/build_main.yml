@@ -9,6 +9,7 @@ on:
       - "images/**"
       - "**/CHANGELOG.md"
       - "**/README.md"
+  workflow_dispatch:
 
 jobs:
   build:
