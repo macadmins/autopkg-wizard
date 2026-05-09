@@ -37,6 +37,40 @@ struct AutoPkgSearchResultTests {
         #expect(results[0].path == "Recipes/Firefox/Firefox.download.recipe")
     }
 
+    @Test func parsesRecipeNamesWithSpaces() {
+        let output = """
+        Name                  Repo               Path
+        ----                  ----               ----
+        Opera.intune          user/recipes       Recipes/Opera/Opera.intune.recipe
+        Opera GX.munki        user/recipes       Recipes/Opera GX/Opera GX.munki.recipe
+        """
+        let results = AutoPkgSearchResult.parse(from: output)
+        #expect(results.count == 2)
+        #expect(results[0].name == "Opera.intune")
+        #expect(results[1].name == "Opera GX.munki")
+        #expect(results[1].repo == "user/recipes")
+        #expect(results[1].path == "Recipes/Opera GX/Opera GX.munki.recipe")
+    }
+
+    @Test func ignoresTrailingInformationalLines() {
+        let output = """
+        Name                                 Repo                    Path                                                             
+        ----                                 ----                    ----                                                             
+        Opera.intune.recipe                  almenscorner-recipes    Opera/Opera.intune.recipe                                        
+        Opera GX.munki.recipe                dataJAR-recipes         Opera GX/Opera GX.munki.recipe                                   
+
+        To add a new recipe repo, use `autopkg repo-add <repo name>`
+
+        If you don't see the recipe you're looking for, try searching https://autopkgweb.com/ (maintained by @jannheider).
+
+        """
+        let results = AutoPkgSearchResult.parse(from: output)
+        #expect(results.count == 2)
+        #expect(results[0].name == "Opera.intune.recipe")
+        #expect(results[1].name == "Opera GX.munki.recipe")
+        #expect(results[1].repo == "dataJAR-recipes")
+    }
+
     @Test func parseWithoutSeparatorReturnsEmpty() {
         let output = "no header here just random text"
         #expect(AutoPkgSearchResult.parse(from: output).isEmpty)
