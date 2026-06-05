@@ -4,6 +4,8 @@ struct OverridesView: View {
     @State private var viewModel = OverridesViewModel()
     @State private var isEditing = false
     @State private var selectedOverrides: Set<String> = []
+    @State private var isRenamingOverride = false
+    @State private var renameText = ""
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -45,6 +47,9 @@ struct OverridesView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .overridesDidChange)) { _ in
             viewModel.loadOverrides()
+        }
+        .onChange(of: viewModel.selectedOverride) { _, _ in
+            isRenamingOverride = false
         }
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK", role: .cancel) {}
@@ -146,8 +151,8 @@ struct OverridesView: View {
         Group {
             if let override = viewModel.selectedOverride {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(override.fileName)
-                        .font(.headline)
+                    // Rename header
+                    overrideNameHeader(for: override)
                         .padding(.horizontal)
                         .padding(.top, 8)
 
@@ -240,6 +245,46 @@ struct OverridesView: View {
     }
 
     @ViewBuilder
+    private func overrideNameHeader(for override: AutoPkgOverride) -> some View {
+        if isRenamingOverride {
+            HStack {
+                TextField("Override name", text: $renameText)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { commitRename(override) }
+                Button {
+                    commitRename(override)
+                } label: {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                }
+                .buttonStyle(.plain)
+                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button {
+                    isRenamingOverride = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            HStack(spacing: 6) {
+                Text(override.recipeName)
+                    .font(.headline)
+                Text(override.fileName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button {
+                    renameText = override.recipeName
+                    isRenamingOverride = true
+                } label: {
+                    Image(systemName: "pencil").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Rename override")
+            }
+        }
+    }
+
+    @ViewBuilder
     private func trustBadge(_ state: OverridesViewModel.TrustState) -> some View {
         HStack(spacing: 4) {
             Image(systemName: state.icon).foregroundStyle(state.color)
@@ -262,6 +307,13 @@ struct OverridesView: View {
         } else {
             selectedOverrides.insert(override.id)
         }
+    }
+
+    private func commitRename(_ override: AutoPkgOverride) {
+        let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        isRenamingOverride = false
+        viewModel.renameOverride(override, newRecipeName: name)
     }
 
     private func deleteSelectedOverrides() {

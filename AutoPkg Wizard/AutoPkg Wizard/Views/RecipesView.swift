@@ -59,6 +59,17 @@ struct RecipesView: View {
         .onReceive(NotificationCenter.default.publisher(for: .overridesDidChange)) { _ in
             viewModel.loadOverrides()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .overrideWasRenamed)) { note in
+            if let oldName = note.userInfo?["oldName"] as? String,
+               let newName = note.userInfo?["newName"] as? String {
+                viewModel.handleOverrideRenamed(oldName: oldName, newName: newName)
+            }
+        }
+        .sheet(isPresented: $viewModel.showMakeOverrideSheet) {
+            if let parent = viewModel.pendingOverrideParent {
+                MakeOverrideSheet(viewModel: viewModel, parentRecipeName: parent)
+            }
+        }
         .sheet(isPresented: $viewModel.showAddSheet) {
             AddRecipeSheet(viewModel: viewModel)
         }
@@ -109,7 +120,7 @@ struct RecipesView: View {
                                         .controlSize(.small)
                                 } else {
                                     Button {
-                                        Task { await viewModel.makeOverride(recipe) }
+                                        viewModel.requestMakeOverride(recipe)
                                     } label: {
                                         Image(systemName: "document.on.document")
                                             .foregroundStyle(viewModel.hasOverride(recipe) ? .green.opacity(0.6) : .secondary)
@@ -619,5 +630,72 @@ struct InputValueLeaf: View {
         Text(text.isEmpty ? "—" : text)
             .font(.system(.body, design: .monospaced))
             .textSelection(.enabled)
+    }
+}
+
+// MARK: - Make Override Sheet
+
+struct MakeOverrideSheet: View {
+    @Bindable var viewModel: RecipesViewModel
+    let parentRecipeName: String
+
+    @State private var overrideName: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Create Recipe Override").font(.headline)
+
+            Text("Parent recipe: \(parentRecipeName)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Override name")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("Override name (e.g. MyOrg-Firefox.munki)", text: $overrideName)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { submit() }
+                Text("This becomes the filename and recipe list entry. Defaults to the parent recipe name.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            HStack {
+                Button("Cancel") {
+                    viewModel.showMakeOverrideSheet = false
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Spacer()
+
+                Button("Create Override") {
+                    submit()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(overrideName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 440)
+        .onAppear {
+            overrideName = parentRecipeName
+        }
+    }
+
+    private func submit() {
+        let name = overrideName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        viewModel.showMakeOverrideSheet = false
+        Task {
+            await viewModel.makeOverride(
+                parent: parentRecipeName,
+                overrideName: name,
+                updateListEntry: viewModel.pendingOverrideAddToList
+            )
+        }
     }
 }

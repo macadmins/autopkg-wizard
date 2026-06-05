@@ -40,6 +40,15 @@ final class RecipesViewModel {
         overridesList.filter { !isInRecipeList($0.recipeName) }
     }
 
+    // MARK: - Make-Override Sheet State
+
+    /// The parent recipe name for which we're about to create an override
+    var pendingOverrideParent: String?
+    /// Whether to add the (possibly renamed) override name to the recipe list after creation
+    var pendingOverrideAddToList: Bool = false
+    /// Whether the make-override naming sheet is visible
+    var showMakeOverrideSheet: Bool = false
+
     // MARK: - Recipe List Management
 
     /// Strip recipe file suffixes (.recipe, .recipe.yaml, .recipe.plist) from a name.
@@ -92,7 +101,9 @@ final class RecipesViewModel {
         recipeList.append(stripped)
         saveRecipeList()
         if UserDefaults.standard.bool(forKey: "autoCreateOverride"), !hasOverride(stripped) {
-            Task { await makeOverride(stripped) }
+            pendingOverrideParent = stripped
+            pendingOverrideAddToList = true
+            showMakeOverrideSheet = true
         }
     }
 
@@ -127,18 +138,45 @@ final class RecipesViewModel {
         existingOverrides.contains(recipeName.lowercased())
     }
 
-    /// Create an override for the given recipe.
-    func makeOverride(_ recipeName: String) async {
-        creatingOverrideFor = recipeName
+    /// Show the naming sheet before creating an override from the recipe list button.
+    func requestMakeOverride(_ recipeName: String) {
+        pendingOverrideParent = recipeName
+        pendingOverrideAddToList = false
+        showMakeOverrideSheet = true
+    }
+
+    /// Create an override for `parentRecipeName` using `overrideName` as the output name.
+    /// If `updateListEntry` is true, the recipe list entry for `parentRecipeName` is replaced
+    /// with `overrideName` (used when auto-creating on add, so the list tracks the override).
+    func makeOverride(parent parentRecipeName: String, overrideName: String, updateListEntry: Bool) async {
+        let name = overrideName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        creatingOverrideFor = parentRecipeName
         do {
-            _ = try await cli.makeOverride(recipeName)
+            let customName = (name == parentRecipeName) ? nil : name
+            _ = try await cli.makeOverride(parentRecipeName, name: customName)
+            if updateListEntry, name != parentRecipeName,
+               let idx = recipeList.firstIndex(of: parentRecipeName) {
+                recipeList[idx] = name
+                saveRecipeList()
+            }
             loadOverrides()
             NotificationCenter.default.post(name: .overridesDidChange, object: nil)
         } catch {
-            errorMessage = "Failed to create override for \(recipeName): \(error.localizedDescription)"
+            errorMessage = "Failed to create override for \(parentRecipeName): \(error.localizedDescription)"
             showError = true
         }
         creatingOverrideFor = nil
+    }
+
+    /// Called when an override file is renamed in the Overrides pane.
+    func handleOverrideRenamed(oldName: String, newName: String) {
+        guard oldName != newName else { return }
+        if let idx = recipeList.firstIndex(of: oldName) {
+            recipeList[idx] = newName
+            saveRecipeList()
+        }
+        loadOverrides()
     }
 
     // MARK: - MakeCatalogs.munki management
