@@ -30,8 +30,15 @@ final class RecipesViewModel {
 
     /// Set of recipe names that have an existing override (stripped, lowercased for matching)
     var existingOverrides: Set<String> = []
+    /// Full list of override files (used to compute overridesNotInList)
+    var overridesList: [AutoPkgOverride] = []
     /// The recipe currently having an override created
     var creatingOverrideFor: String?
+
+    /// Overrides whose recipe name is not present in the current recipe list.
+    var overridesNotInList: [AutoPkgOverride] {
+        overridesList.filter { !isInRecipeList($0.recipeName) }
+    }
 
     // MARK: - Recipe List Management
 
@@ -84,6 +91,9 @@ final class RecipesViewModel {
         guard !stripped.isEmpty, !isInRecipeList(stripped) else { return }
         recipeList.append(stripped)
         saveRecipeList()
+        if UserDefaults.standard.bool(forKey: "autoCreateOverride"), !hasOverride(stripped) {
+            Task { await makeOverride(stripped) }
+        }
     }
 
     func removeRecipes(at offsets: IndexSet) {
@@ -108,6 +118,7 @@ final class RecipesViewModel {
     /// Scan the overrides directory and build the set of recipe names that have overrides.
     func loadOverrides() {
         let overrides = AutoPkgOverride.listOverrides(in: cli.overridesDirectory)
+        overridesList = overrides
         existingOverrides = Set(overrides.map { $0.recipeName.lowercased() })
     }
 

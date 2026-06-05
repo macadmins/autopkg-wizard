@@ -12,7 +12,7 @@ You can build a recipe list within the app by searching for recipes. Once a reci
 
 Overrides can be edited within the app, or deleted. You can also amend the autopkg run verbosity, and add pre- and post-processors which will apply to all recipes. You can also add key-value pairs, and supply paths to packages for recipes that require them. These options would also apply to all recipes, but as most would be suitable for running individual recipes in the list, you can enable or disable each one without deleting them.
 
-Finally, you can schedule an automatic daily run of your recipe list, which creates a Launch Agent. 
+Finally, you can schedule an automatic daily run of your recipe list, which creates a Launch Agent.
 
 ## Requirements
 
@@ -44,6 +44,7 @@ The landing page shows a dashboard with counts of repos, recipes, and overrides,
 
 - Manage a recipe list file (default: `~/Library/AutoPkg/recipe-list.txt`)
 - Add recipes from locally available recipes, GitHub search, or manual entry
+- Recipe Overrides that are not in the recipe list are also listed and can be added to the list
 - When adding a recipe from search, the required repo is automatically added if not already installed
 - Drag to reorder and edit mode with multi-select for bulk removal
 - Run individual recipes or the entire list, with real-time streaming log output
@@ -90,6 +91,14 @@ The landing page shows a dashboard with counts of repos, recipes, and overrides,
 - Enable/disable the schedule with automatic LaunchAgent management
 - View next scheduled run time, agent status, and last run time
 
+### Settings
+
+- Choose an alternative path to the `autopkg` binary
+- Choose an alternative Recipe List file
+- Choose to automatically create an override when adding a recipe to the recipe list
+- Choose an alternative Recipe Overrides directory
+- Restore defaults
+
 ## Building
 
 Build using `make` from the repo root:
@@ -103,6 +112,7 @@ make clean        # Remove all build artifacts
 ```
 
 The `make release` target can only be run by the repo owner or in your own fork:
+
 1. Compiles an optimised release build via Xcode
 2. Creates a macOS distribution installer package (`AutoPkgWizard-<version>.pkg`) that installs the app into `/Applications`
 3. Creates a distributable disk image (`AutoPkgWizard-<version>.dmg`)

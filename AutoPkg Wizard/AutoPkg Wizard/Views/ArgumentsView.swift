@@ -214,7 +214,11 @@ struct ArgumentsView: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
+        if let lastDir = UserDefaults.standard.string(forKey: "lastSourcePackageDirectory") {
+            panel.directoryURL = URL(fileURLWithPath: lastDir)
+        }
         if panel.runModal() == .OK, let url = panel.url {
+            UserDefaults.standard.set(url.deletingLastPathComponent().path, forKey: "lastSourcePackageDirectory")
             viewModel.addSourcePackage(url.path)
         }
     }

@@ -7,7 +7,7 @@ struct RecipesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.recipeList.isEmpty {
+            if viewModel.recipeList.isEmpty && viewModel.overridesNotInList.isEmpty {
                 ContentUnavailableView(
                     "No Recipes in List",
                     systemImage: "list.bullet.rectangle",
@@ -78,6 +78,7 @@ struct RecipesView: View {
     private var recipeListView: some View {
         VStack(spacing: 0) {
             List {
+                if !viewModel.recipeList.isEmpty {
                 Section {
                     ForEach(viewModel.recipeList, id: \.self) { recipe in
                         HStack {
@@ -163,6 +164,25 @@ struct RecipesView: View {
                         Text(AutoPkgCLI.shared.recipeListPath)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
+                    }
+                }
+                } // end if !viewModel.recipeList.isEmpty
+
+                if !viewModel.overridesNotInList.isEmpty {
+                    Section {
+                        ForEach(viewModel.overridesNotInList) { override in
+                            HStack {
+                                RecipeRow(name: override.recipeName)
+                                Spacer()
+                                Button("Add to List") {
+                                    viewModel.addRecipe(override.recipeName)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                        }
+                    } header: {
+                        Text("Recipe Overrides not in Recipe List")
                     }
                 }
             }
