@@ -175,9 +175,11 @@ final class AutoPkgCLI {
 
     // MARK: - Override Operations
 
-    /// Create a recipe override
-    func makeOverride(_ recipeName: String) async throws -> String {
-        try await runSimple(arguments: ["make-override", recipeName])
+    /// Create a recipe override, optionally with a custom output name
+    func makeOverride(_ recipeName: String, name: String? = nil) async throws -> String {
+        var args = ["make-override", recipeName]
+        if let name { args += ["--name", name] }
+        return try await runSimple(arguments: args)
     }
 
     /// Verify trust info for a recipe override

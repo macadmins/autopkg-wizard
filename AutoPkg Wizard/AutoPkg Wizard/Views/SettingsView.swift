@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var recipeListPath: String = AutoPkgCLI.shared.recipeListPath
     @State private var overridesDirectory: String = AutoPkgCLI.shared.overridesDirectory
     @State private var isSaved = false
+    @AppStorage("autoCreateOverride") private var autoCreateOverride = false
 
     @Bindable private var themeManager = SyntaxThemeManager.shared
     private var cli = AutoPkgCLI.shared
@@ -21,7 +22,7 @@ struct SettingsView: View {
             aboutTab
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 500, height: 380)
+        .frame(width: 500, height: 430)
     }
 
     // MARK: - General Tab
@@ -29,18 +30,21 @@ struct SettingsView: View {
     private var generalTab: some View {
         Form {
             Section("AutoPkg Binary") {
-                HStack {
-                    TextField("Path to autopkg", text: $autoPkgPath)
-                        .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        TextField("", text: $autoPkgPath)
+                            .textFieldStyle(.roundedBorder)
 
-                    Button("Browse…") {
-                        let panel = NSOpenPanel()
-                        panel.canChooseFiles = true
-                        panel.canChooseDirectories = false
-                        panel.allowsMultipleSelection = false
-                        panel.directoryURL = URL(fileURLWithPath: "/usr/local/bin")
-                        if panel.runModal() == .OK, let url = panel.url {
-                            autoPkgPath = url.path
+                        Button("Browse…") {
+                            let panel = NSOpenPanel()
+                            panel.canChooseFiles = true
+                            panel.canChooseDirectories = false
+                            panel.allowsMultipleSelection = false
+                            let expanded = NSString(string: autoPkgPath).expandingTildeInPath
+                            panel.directoryURL = URL(fileURLWithPath: expanded).deletingLastPathComponent()
+                            if panel.runModal() == .OK, let url = panel.url {
+                                autoPkgPath = url.path
+                            }
                         }
                     }
                 }
@@ -57,35 +61,47 @@ struct SettingsView: View {
             }
 
             Section("Recipe List File") {
-                HStack {
-                    TextField("Recipe list path", text: $recipeListPath)
-                        .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        TextField("", text: $recipeListPath)
+                            .textFieldStyle(.roundedBorder)
 
-                    Button("Browse…") {
-                        let panel = NSOpenPanel()
-                        panel.canChooseFiles = true
-                        panel.canChooseDirectories = false
-                        panel.allowsMultipleSelection = false
-                        panel.allowedContentTypes = [.plainText]
-                        if panel.runModal() == .OK, let url = panel.url {
-                            recipeListPath = url.path
+                        Button("Browse…") {
+                            let panel = NSOpenPanel()
+                            panel.canChooseFiles = true
+                            panel.canChooseDirectories = false
+                            panel.allowsMultipleSelection = false
+                            panel.allowedContentTypes = [.plainText]
+                            let expanded = NSString(string: recipeListPath).expandingTildeInPath
+                            panel.directoryURL = URL(fileURLWithPath: expanded).deletingLastPathComponent()
+                            if panel.runModal() == .OK, let url = panel.url {
+                                recipeListPath = url.path
+                            }
                         }
                     }
                 }
             }
 
-            Section("Recipe Overrides Directory") {
-                HStack {
-                    TextField("Overrides directory", text: $overridesDirectory)
-                        .textFieldStyle(.roundedBorder)
+            Section("Recipe Options") {
+                Toggle("Automatically create override when adding a recipe", isOn: $autoCreateOverride)
+            }
 
-                    Button("Browse…") {
-                        let panel = NSOpenPanel()
-                        panel.canChooseFiles = false
-                        panel.canChooseDirectories = true
-                        panel.allowsMultipleSelection = false
-                        if panel.runModal() == .OK, let url = panel.url {
-                            overridesDirectory = url.path
+            Section("Recipe Overrides Directory") {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        TextField("", text: $overridesDirectory)
+                            .textFieldStyle(.roundedBorder)
+
+                        Button("Browse…") {
+                            let panel = NSOpenPanel()
+                            panel.canChooseFiles = false
+                            panel.canChooseDirectories = true
+                            panel.allowsMultipleSelection = false
+                            let expanded = NSString(string: overridesDirectory).expandingTildeInPath
+                            panel.directoryURL = URL(fileURLWithPath: expanded)
+                            if panel.runModal() == .OK, let url = panel.url {
+                                overridesDirectory = url.path
+                            }
                         }
                     }
                 }
@@ -103,6 +119,7 @@ struct SettingsView: View {
                         autoPkgPath = "/usr/local/bin/autopkg"
                         recipeListPath = NSString(string: "~/Library/AutoPkg/recipe-list.txt").expandingTildeInPath
                         overridesDirectory = NSString(string: "~/Library/AutoPkg/RecipeOverrides").expandingTildeInPath
+                        autoCreateOverride = false
                     }
 
                     Button("Save") {

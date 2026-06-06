@@ -234,8 +234,46 @@ final class OverridesViewModel {
             showError = true
         }
     }
+
+    /// Rename the override file to use `newRecipeName` as the base name, preserving the extension.
+    func renameOverride(_ override: AutoPkgOverride, newRecipeName: String) {
+        let trimmed = newRecipeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != override.recipeName else { return }
+
+        let ext: String
+        if override.fileName.hasSuffix(".recipe.yaml") { ext = ".recipe.yaml" }
+        else if override.fileName.hasSuffix(".recipe.plist") { ext = ".recipe.plist" }
+        else { ext = ".recipe" }
+
+        let expandedDir = (NSString(string: cli.overridesDirectory).expandingTildeInPath as NSString)
+        let newFileName = trimmed + ext
+        let newPath = expandedDir.appendingPathComponent(newFileName)
+
+        do {
+            try FileManager.default.moveItem(atPath: override.filePath, toPath: newPath)
+        } catch {
+            errorMessage = "Failed to rename override: \(error.localizedDescription)"
+            showError = true
+            return
+        }
+
+        let oldName = override.recipeName
+        loadOverrides()
+        // Re-select the renamed file
+        if let updated = overrides.first(where: { $0.fileName == newFileName }) {
+            selectOverride(updated)
+        }
+
+        NotificationCenter.default.post(
+            name: .overrideWasRenamed,
+            object: nil,
+            userInfo: ["oldName": oldName, "newName": trimmed]
+        )
+        NotificationCenter.default.post(name: .overridesDidChange, object: nil)
+    }
 }
 
 extension Notification.Name {
     static let overridesDidChange = Notification.Name("overridesDidChange")
+    static let overrideWasRenamed = Notification.Name("overrideWasRenamed")
 }

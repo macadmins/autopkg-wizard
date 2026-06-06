@@ -4,3 +4,6 @@
 DerivedData/
 xcuserdata/
 output/
+
+# Ignore LLM skills
+CLAUDE.md

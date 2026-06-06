@@ -30,8 +30,24 @@ final class RecipesViewModel {
 
     /// Set of recipe names that have an existing override (stripped, lowercased for matching)
     var existingOverrides: Set<String> = []
+    /// Full list of override files (used to compute overridesNotInList)
+    var overridesList: [AutoPkgOverride] = []
     /// The recipe currently having an override created
     var creatingOverrideFor: String?
+
+    /// Overrides whose recipe name is not present in the current recipe list.
+    var overridesNotInList: [AutoPkgOverride] {
+        overridesList.filter { !isInRecipeList($0.recipeName) }
+    }
+
+    // MARK: - Make-Override Sheet State
+
+    /// The parent recipe name for which we're about to create an override
+    var pendingOverrideParent: String?
+    /// Whether to add the (possibly renamed) override name to the recipe list after creation
+    var pendingOverrideAddToList: Bool = false
+    /// Whether the make-override naming sheet is visible
+    var showMakeOverrideSheet: Bool = false
 
     // MARK: - Recipe List Management
 
@@ -84,6 +100,11 @@ final class RecipesViewModel {
         guard !stripped.isEmpty, !isInRecipeList(stripped) else { return }
         recipeList.append(stripped)
         saveRecipeList()
+        if UserDefaults.standard.bool(forKey: "autoCreateOverride"), !hasOverride(stripped) {
+            pendingOverrideParent = stripped
+            pendingOverrideAddToList = true
+            showMakeOverrideSheet = true
+        }
     }
 
     func removeRecipes(at offsets: IndexSet) {
@@ -108,6 +129,7 @@ final class RecipesViewModel {
     /// Scan the overrides directory and build the set of recipe names that have overrides.
     func loadOverrides() {
         let overrides = AutoPkgOverride.listOverrides(in: cli.overridesDirectory)
+        overridesList = overrides
         existingOverrides = Set(overrides.map { $0.recipeName.lowercased() })
     }
 
@@ -116,18 +138,45 @@ final class RecipesViewModel {
         existingOverrides.contains(recipeName.lowercased())
     }
 
-    /// Create an override for the given recipe.
-    func makeOverride(_ recipeName: String) async {
-        creatingOverrideFor = recipeName
+    /// Show the naming sheet before creating an override from the recipe list button.
+    func requestMakeOverride(_ recipeName: String) {
+        pendingOverrideParent = recipeName
+        pendingOverrideAddToList = false
+        showMakeOverrideSheet = true
+    }
+
+    /// Create an override for `parentRecipeName` using `overrideName` as the output name.
+    /// If `updateListEntry` is true, the recipe list entry for `parentRecipeName` is replaced
+    /// with `overrideName` (used when auto-creating on add, so the list tracks the override).
+    func makeOverride(parent parentRecipeName: String, overrideName: String, updateListEntry: Bool) async {
+        let name = overrideName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        creatingOverrideFor = parentRecipeName
         do {
-            _ = try await cli.makeOverride(recipeName)
+            let customName = (name == parentRecipeName) ? nil : name
+            _ = try await cli.makeOverride(parentRecipeName, name: customName)
+            if updateListEntry, name != parentRecipeName,
+               let idx = recipeList.firstIndex(of: parentRecipeName) {
+                recipeList[idx] = name
+                saveRecipeList()
+            }
             loadOverrides()
             NotificationCenter.default.post(name: .overridesDidChange, object: nil)
         } catch {
-            errorMessage = "Failed to create override for \(recipeName): \(error.localizedDescription)"
+            errorMessage = "Failed to create override for \(parentRecipeName): \(error.localizedDescription)"
             showError = true
         }
         creatingOverrideFor = nil
+    }
+
+    /// Called when an override file is renamed in the Overrides pane.
+    func handleOverrideRenamed(oldName: String, newName: String) {
+        guard oldName != newName else { return }
+        if let idx = recipeList.firstIndex(of: oldName) {
+            recipeList[idx] = newName
+            saveRecipeList()
+        }
+        loadOverrides()
     }
 
     // MARK: - MakeCatalogs.munki management
