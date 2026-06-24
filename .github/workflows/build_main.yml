@@ -116,8 +116,6 @@ jobs:
             --install-location /Applications \
             --identifier "com.grahamrpugh.AutoPkg-Wizard" \
             --version "$VERSION" \
-            --arch arm64 \
-            --arch x86_64 \
             --sign "${{ vars.SIGN_ID_PKG }}" \
             "$COMPONENT"
 
@@ -127,7 +125,7 @@ jobs:
           <installer-gui-script minSpecVersion="2">
               <title>AutoPkg Wizard</title>
               <pkg-ref id="com.grahamrpugh.AutoPkg-Wizard"/>
-              <options customize="never" require-scripts="false" rootVolumeOnly="true"/>
+              <options customize="never" require-scripts="false" rootVolumeOnly="true" hostArchitectures="arm64,x86_64"/>
               <choices-outline>
                   <line choice="default">
                       <line choice="com.grahamrpugh.AutoPkg-Wizard"/>

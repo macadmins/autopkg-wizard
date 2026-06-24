@@ -300,8 +300,6 @@ _pkg:
 		--install-location /Applications \
 		--identifier "$(BUNDLE_ID)" \
 		--version "$(VERSION)" \
-		--arch arm64 \
-		--arch x86_64 \
 		--sign "$(SIGN_ID_PKG)" \
 		"$(COMPONENT)"
 	@echo "==> Writing distribution XML…"
@@ -310,7 +308,7 @@ _pkg:
 		echo '<installer-gui-script minSpecVersion="2">'; \
 		echo '	<title>$(APP_NAME)</title>'; \
 		echo '	<pkg-ref id="$(BUNDLE_ID)"/>'; \
-		echo '	<options customize="never" require-scripts="false" rootVolumeOnly="true"/>'; \
+		echo '	<options customize="never" require-scripts="false" rootVolumeOnly="true" hostArchitectures="arm64,x86_64"/>'; \
 		echo '	<choices-outline>'; \
 		echo '		<line choice="default">'; \
 		echo '			<line choice="$(BUNDLE_ID)"/>'; \
