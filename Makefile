@@ -277,6 +277,23 @@ github:
 # --- Internal: create the .pkg ---------------------------------------------
 _pkg:
 	@mkdir -p "$(OUTPUT_DIR)"
+	@echo "==> Verifying app is universal binary…"
+	@ARCHS=$$(lipo -archs "$(RELEASE_APP)/Contents/MacOS/AutoPkg Wizard" 2>/dev/null || echo "error"); \
+	if [ "$$ARCHS" = "error" ]; then \
+		echo "ERROR: Could not read architectures from $(RELEASE_APP)" >&2; \
+		exit 1; \
+	fi; \
+	if ! echo "$$ARCHS" | grep -q "arm64"; then \
+		echo "ERROR: App does not contain arm64 architecture. Found: $$ARCHS" >&2; \
+		echo "       Run 'make release' to build a universal binary first." >&2; \
+		exit 1; \
+	fi; \
+	if ! echo "$$ARCHS" | grep -q "x86_64"; then \
+		echo "ERROR: App does not contain x86_64 architecture. Found: $$ARCHS" >&2; \
+		echo "       Run 'make release' to build a universal binary first." >&2; \
+		exit 1; \
+	fi; \
+	echo "	✓ Verified universal binary: $$ARCHS"
 	@echo "==> Creating component package…"
 	@pkgbuild \
 		--component "$(RELEASE_APP)" \

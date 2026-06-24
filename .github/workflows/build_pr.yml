@@ -87,6 +87,18 @@ jobs:
           COMPONENT="artifacts/AutoPkgWizard-component.pkg"
           DIST_XML="artifacts/distribution.xml"
 
+          # Verify universal binary
+          ARCHS=$(lipo -archs "$APP_PATH/Contents/MacOS/AutoPkg Wizard")
+          echo "App architectures: $ARCHS"
+          if ! echo "$ARCHS" | grep -q "arm64"; then
+            echo "ERROR: App does not contain arm64 architecture" >&2
+            exit 1
+          fi
+          if ! echo "$ARCHS" | grep -q "x86_64"; then
+            echo "ERROR: App does not contain x86_64 architecture" >&2
+            exit 1
+          fi
+
           # Create component package
           pkgbuild \
             --component "$APP_PATH" \
