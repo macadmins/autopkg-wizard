@@ -93,6 +93,8 @@ jobs:
             --install-location /Applications \
             --identifier "com.grahamrpugh.AutoPkg-Wizard" \
             --version "$VERSION" \
+            --arch arm64 \
+            --arch x86_64 \
             --sign "${{ vars.SIGN_ID_PKG }}" \
             "$COMPONENT"
 

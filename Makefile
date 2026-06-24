@@ -283,6 +283,8 @@ _pkg:
 		--install-location /Applications \
 		--identifier "$(BUNDLE_ID)" \
 		--version "$(VERSION)" \
+		--arch arm64 \
+		--arch x86_64 \
 		--sign "$(SIGN_ID_PKG)" \
 		"$(COMPONENT)"
 	@echo "==> Writing distribution XML…"
