@@ -93,6 +93,23 @@ jobs:
           COMPONENT="artifacts/AutoPkgWizard-component.pkg"
           DIST_XML="artifacts/distribution.xml"
 
+          # Verify universal binary
+          ARCHS=$(lipo -archs "$APP_PATH/Contents/MacOS/AutoPkg Wizard" 2>/dev/null || echo "error")
+          if [ "$ARCHS" = "error" ]; then
+            echo "ERROR: Could not read architectures from $APP_PATH" >&2
+            echo "       Binary may be missing or invalid." >&2
+            exit 1
+          fi
+          echo "App architectures: $ARCHS"
+          if ! echo "$ARCHS" | grep -q "arm64"; then
+            echo "ERROR: App does not contain arm64 architecture. Found: $ARCHS" >&2
+            exit 1
+          fi
+          if ! echo "$ARCHS" | grep -q "x86_64"; then
+            echo "ERROR: App does not contain x86_64 architecture. Found: $ARCHS" >&2
+            exit 1
+          fi
+
           # Create component package
           pkgbuild \
             --component "$APP_PATH" \
@@ -108,7 +125,7 @@ jobs:
           <installer-gui-script minSpecVersion="2">
               <title>AutoPkg Wizard</title>
               <pkg-ref id="com.grahamrpugh.AutoPkg-Wizard"/>
-              <options customize="never" require-scripts="false" rootVolumeOnly="true"/>
+              <options customize="never" require-scripts="false" rootVolumeOnly="true" hostArchitectures="arm64,x86_64"/>
               <choices-outline>
                   <line choice="default">
                       <line choice="com.grahamrpugh.AutoPkg-Wizard"/>
